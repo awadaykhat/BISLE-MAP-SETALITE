@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Ethiopia Pro Map | Pro Layout</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.20.6/dist/leaflet-geoman.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-measure/dist/leaflet-measure.css" />
+    
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; }
+        
+        /* Map Container - Leaves space at bottom for nav bar */
+        #map { height: calc(100vh - 60px); width: 100vw; background: #1a1a1a; transform: translateZ(0); will-change: transform; }
+        
+        /* =========================================
+           TOP HORIZONTAL PANEL (Measurement)
+           ========================================= */
+        .top-panel { 
+            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.85); color: white; padding: 10px 20px;
+            border-radius: 12px; text-align: center; z-index: 1000; pointer-events: none;
+            min-width: 150px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); 
+        }
+        .area-text { margin: 0; font-size: 24px; font-weight: bold; }
+        .area-text span { font-size: 14px; font-weight: normal; color: #aaa; }
+        .perimeter-text { margin: 3px 0 0 0; font-size: 12px; color: #ccc; }
+
+        /* =========================================
+           BOTTOM HORIZONTAL NAVIGATION BAR
+           ========================================= */
+        .bottom-nav {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 60px;
+            background: #ffffff; box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            display: flex; align-items: center; z-index: 1000; padding: 0 10px; box-sizing: border-box;
+        }
+        
+        /* Property Selector (Fixed Left side of bottom nav) */
+        .property-selector {
+            display: flex; align-items: center; gap: 5px; margin-right: 10px;
+            border-right: 1px solid #ddd; padding-right: 10px; white-space: nowrap;
+        }
+        .property-selector label { font-size: 12px; font-weight: bold; color: #333; }
+        .property-selector select { padding: 6px; border-radius: 6px; border: 1px solid #ccc; font-size: 12px; font-weight: bold; outline: none; }
+
+        /* Action Buttons (Scrollable horizontally) */
+        .action-buttons {
+            display: flex; gap: 8px; overflow-x: auto; flex: 1; padding-bottom: 5px; padding-top: 5px;
+            scrollbar-width: none; /* Firefox */
+        }
+        .action-buttons::-webkit-scrollbar { display: none; } /* Chrome */
+        
+        .action-buttons button { 
+            padding: 8px 12px; border: none; border-radius: 6px; background: #f0f0f0;
+            cursor: pointer; font-weight: bold; font-size: 12px; white-space: nowrap;
+            display: flex; align-items: center; gap: 4px; transition: background 0.2s;
+        }
+        .action-buttons button:hover { background: #e0e0e0; }
+        
+        /* Button Colors */
+        .btn-danger { color: #d32f2f !important; background: #ffebee !important; }
+        .btn-export { background: #e3f2fd !important; color: #0056b3 !important; }
+        .btn-view { background: #e8f5e9 !important; color: #2e7d32 !important; }
+
+        /* =========================================
+           LEFT VERTICAL PANEL (Coordinates)
+           ========================================= */
+        .coords-panel { 
+            position: absolute; bottom: 75px; left: 15px; background: rgba(255,255,255,0.95); padding: 8px;
+            border-radius: 8px; z-index: 1000; max-height: 150px; overflow-y: auto; width: 130px;
+            display: none; font-size: 11px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); border-left: 3px solid #007bff; 
+        }
+        .coords-panel strong { display: block; margin-bottom: 5px; border-bottom: 1px solid #eee; padding-bottom: 5px; font-size: 10px;}
+        ul#coord-list { margin: 0; padding-left: 10px; font-family: monospace; }
+
+        /* Geoman Toolbar adjustments */
+        .leaflet-pm-toolbar { margin-top: 75px !important; margin-left: 10px !important; }
+        .leaflet-measure-control { margin-top: 75px !important; margin-right: 10px !important; }
+        
+        .leaflet-tile { filter: none !important; }
+        .leaflet-zoom-animated { transition: transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1); }
+
+        /* --- MODAL STYLES --- */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); z-index: 2000; justify-content: center; align-items: center;
+        }
+        .modal-content {
+            background: white; padding: 20px; border-radius: 10px; width: 85%; max-width: 350px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3); font-size: 14px;
+        }
+        .modal-content h2 { margin-top: 0; font-size: 18px; color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+        .form-group { margin-bottom: 12px; display: flex; flex-direction: column; }
+        .form-group label { font-weight: bold; margin-bottom: 4px; color: #555; }
+        .form-group input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        .form-group input[readonly] { background-color: #e9ecef; color: #495057; cursor: not-allowed; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+        .modal-actions button { padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .btn-cancel { background: #ccc; color: #333; }
+        .btn-save { background: #28a745; color: white; }
+
+        /* Custom Popup Styling */
+        .leaflet-popup-content-wrapper { border-radius: 8px; box-shadow: 0 3px 14px rgba(0,0,0,0.4); }
+        .leaflet-popup-content { margin: 15px; font-size: 13px; line-height: 1.5; color: #333; }
+        .popup-title { font-size: 16px; font-weight: bold; color: #007bff; margin-bottom: 5px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .popup-subtitle { font-weight: bold; margin-top: 10px; color: #444; }
+        .popup-list { margin: 5px 0 0 0; padding-left: 15px; }
+        .popup-list li { margin-bottom: 3px; }
+        .highlight { color: #e74c3c; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div id="map"></div>
+
+    <!-- TOP HORIZONTAL PANEL -->
+    <div class="top-panel">
+        <h1 class="area-text" id="areaVal">0.00 <span>Sq. M</span></h1>
+        <p class="perimeter-text" id="perimeterVal">Perimeter 0.00 M</p>
+    </div>
+
+    <!-- LEFT VERTICAL PANEL -->
+    <div class="coords-panel" id="coordPanel">
+        <strong>UTM Zone 38N</strong>
+        <ul id="coord-list"></ul>
+    </div>
+
+    <!-- BOTTOM HORIZONTAL NAVIGATION BAR -->
+    <div class="bottom-nav">
+        <!-- Property Selector (Fixed on left) -->
+        <div class="property-selector">
+            <label>Type:</label>
+            <select id="featureType">
+                <option value="Land Parcel" data-color="#e74c3c">Parcel</option>
+                <option value="Building - HCB" data-color="#3498db">Bldg HCB</option>
+                <option value="Building - CIS" data-color="#f1c40f">Bldg CIS</option>
+                <option value="Building - Stone" data-color="#2ecc71">Bldg Stone</option>
+                <option value="Building - Steel" data-color="#9b59b6">Bldg Steel</option>
+                <option value="Road/Path" data-color="#7f8c8d">Road</option>
+            </select>
+        </div>
+
+        <!-- Action Buttons (Scrollable horizontally) -->
+        <div class="action-buttons">
+            <button id="undoBtn">↩ Undo</button>
+            <button id="redoBtn">↪ Redo</button>
+            <button id="saveBtn">💾 Save</button>
+            <button id="loadBtn">🔄 Reload</button>
+            <button id="clearDataBtn" class="btn-danger">🗑️ Clear</button>
+            <button id="exportExcel" class="btn-export">📊 Excel</button>
+            <button id="exportCSV" class="btn-export">📄 CSV</button>
+            <button id="viewPDF" class="btn-view">👁️ View PDF</button>
+            <button id="downloadPDF" class="btn-export">📥 PDF</button>
+        </div>
+    </div>
+
+    <!-- Parcel Registration Modal -->
+    <div class="modal-overlay" id="registrationModal">
+        <div class="modal-content">
+            <h2>Parcel Registration</h2>
+            <form id="parcelForm">
+                <div class="form-group">
+                    <label>Parcel-ID</label>
+                    <input type="text" id="parcelId" required placeholder="e.g., PRCL-001" />
+                </div>
+                <div class="form-group">
+                    <label>Owner Name</label>
+                    <input type="text" id="ownerName" required placeholder="Enter owner's full name" />
+                </div>
+                <div class="form-group">
+                    <label>Parcel Area (Auto)</label>
+                    <input type="text" id="modalParcelArea" readonly />
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-cancel" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn-save">Save Details</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Libraries -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.20.6/dist/leaflet-geoman.js"></script>
+    <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/proj4@2.22.0/dist/proj4.js"></script>
+    <script src="https://unpkg.com/leaflet-measure/dist/leaflet-measure.js"></script>
+    
+    <!-- Export Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+    <script>
+        proj4.defs("EPSG:32638", "+proj=utm +zone=38 +datum=WGS84 +units=m +no_defs");
+
+        // MAP INITIALIZATION - Optimized for high zoom
+        const map = L.map('map', {
+            zoomControl: false, 
+            minZoom: 3, 
+            maxZoom: 22, // Allow very deep zoom
+            zoomSnap: 0.5, 
+            zoomDelta: 0.5, 
+            wheelPxPerZoomLevel: 120,
+            updateWhenZooming: false, 
+            updateWhenIdle: true
+        }).setView([9.0310, 38.7410], 17);
+
+        // HIGH RESOLUTION SATELLITE IMAGERY
+        // 'lyrs=s' gets pure satellite. 'maxNativeZoom: 20' pushes Google to its highest real resolution, map scales further up to 22.
+        L.tileLayer('https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+            maxZoom: 22, 
+            maxNativeZoom: 20,
+            subdomains: ['0', '1', '2', '3'],
+            detectRetina: true,
+            attribution: '&copy; Google Maps'
+        }).addTo(map);
+
+        L.control.scale({ metric: true, imperial: false, position: 'bottomleft' }).addTo(map);
+
+        // VERTICAL NAVIGATION: Measuring Ruler (Top Right)
+        const measureControl = new L.Control.Measure({
+            position: 'topright', 
+            primaryLengthUnit: 'meters', secondaryLengthUnit: 'kilometers',
+            primaryAreaUnit: 'sqmeters', secondaryAreaUnit: 'hectares',
+            activeColor: '#007bff', completedColor: '#0056b3'
+        });
+        measureControl.addTo(map);
+
+        // VERTICAL NAVIGATION: Drawing Tools (Top Left)
+        map.pm.addControls({
+            position: 'topleft', drawMarker: false, drawCircleMarker: false,
+            drawPolyline: true, drawRectangle: true, drawPolygon: true,
+            drawCircle: false, drawText: false, editMode: true, dragMode: true,
+            cutPolygon: false, removalMode: true, snappingOption: true, snapGuidesOption: true
+        });
+        map.pm.setGlobalOptions({ snappable: true, showSnapGuides: true, snapGuidesAngles: [90] });
+
+        // --- UI & STATE ---
+        const areaVal = document.getElementById('areaVal');
+        const perimeterVal = document.getElementById('perimeterVal');
+        const coordPanel = document.getElementById('coordPanel');
+        const coordList = document.getElementById('coord-list');
+        const featureTypeSelect = document.getElementById('featureType');
+        const modal = document.getElementById('registrationModal');
+        
+        let history = [];
+        let historyIndex = -1;
+        let activeParcelLayer = null; 
+
+        function getCurrentStyle() {
+            const option = featureTypeSelect.options[featureTypeSelect.selectedIndex];
+            return { type: option.value, color: option.getAttribute('data-color') };
+        }
+
+        function updateUTMPanel(coords) {
+            coordList.innerHTML = '';
+            coords.forEach((coord, i) => {
+                if (i < coords.length - 1 || (i === coords.length - 1 && coords.length <= 2)) {
+                    const utm = proj4('EPSG:32638', coord);
+                    const li = document.createElement('li');
+                    li.innerText = `E:${utm[0].toFixed(1)} N:${utm[1].toFixed(1)}`;
+                    coordList.appendChild(li);
+                }
+            });
+            coordPanel.style.display = 'block';
+        }
+
+        // --- POPUP GENERATION LOGIC ---
+        function generatePopup(layer) {
+            const props = layer.feature.properties;
+            const geojson = layer.toGeoJSON();
+            let html = '';
+
+            if (props.category === 'Land Parcel') {
+                const parcelArea = turf.area(geojson).toFixed(2);
+                const linkedBuildings = map.pm.getGeomanLayers().filter(l => 
+                    l.feature && l.feature.properties && l.feature.properties.parentParcelId === props.parcelId
+                );
+
+                let totalBuiltArea = 0;
+                let blockListHTML = '';
+
+                linkedBuildings.forEach(b => {
+                    const bArea = turf.area(b.toGeoJSON());
+                    totalBuiltArea += bArea;
+                    blockListHTML += `<li><b>${b.feature.properties.blockId}</b> - ${b.feature.properties.material} (${bArea.toFixed(1)} m²)</li>`;
+                });
+
+                html += `<div class="popup-title">Parcel: ${props.parcelId || 'Unassigned'}</div>`;
+                html += `<b>Owner:</b> ${props.ownerName || 'N/A'}<br>`;
+                html += `<b>Parcel Area:</b> ${parcelArea} m²<br>`;
+                html += `<b>Total Built Area:</b> <span class="highlight">${totalBuiltArea.toFixed(2)} m²</span><br>`;
+                
+                if (linkedBuildings.length > 0) {
+                    html += `<div class="popup-subtitle">Registered Blocks (${linkedBuildings.length}):</div>`;
+                    html += `<ul class="popup-list">${blockListHTML}</ul>`;
+                } else {
+                    html += `<div class="popup-subtitle" style="color:#888;">No buildings in this parcel.</div>`;
+                }
+
+            } else if (props.category.includes('Building')) {
+                const bArea = turf.area(geojson).toFixed(2);
+                html += `<div class="popup-title">Building Details</div>`;
+                html += `<b>Block ID:</b> ${props.blockId}<br>`;
+                html += `<b>Material:</b> ${props.material}<br>`;
+                html += `<b>Area:</b> ${bArea} m²<br>`;
+                html += `<b>Parent Parcel:</b> ${props.parentParcelId || 'Standalone'}`;
+            }
+            layer.bindPopup(html);
+        }
+
+        function refreshAllPopups() {
+            map.pm.getGeomanLayers().forEach(layer => {
+                if(layer.feature && layer.feature.properties.category) generatePopup(layer);
+            });
+        }
+
+        // --- AUTO-SAVE FUNCTION ---
+        function autoSave() {
+            const layers = map.pm.getGeomanLayers(true);
+            const geojson = layers.toGeoJSON();
+            localStorage.setItem('ethiopiaMapData_Forever', JSON.stringify(geojson));
+        }
+
+        // --- MODAL LOGIC ---
+        function openModal(layer) {
+            activeParcelLayer = layer;
+            document.getElementById('modalParcelArea').value = turf.area(layer.toGeoJSON()).toFixed(2) + " m²";
+            document.getElementById('parcelId').value = layer.feature.properties.parcelId || '';
+            document.getElementById('ownerName').value = layer.feature.properties.ownerName || '';
+            modal.style.display = 'flex';
+        }
+
+        window.closeModal = function() {
+            modal.style.display = 'none';
+            activeParcelLayer = null;
+        }
+
+        document.getElementById('parcelForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            if (!activeParcelLayer) return;
+
+            activeParcelLayer.feature.properties.parcelId = document.getElementById('parcelId').value;
+            activeParcelLayer.feature.properties.ownerName = document.getElementById('ownerName').value;
+
+            generatePopup(activeParcelLayer);
+            modal.style.display = 'none';
+            activeParcelLayer = null;
+            saveHistory();
+            refreshAllPopups();
+            autoSave();
+        });
+
+        // --- SHAPE CREATION LOGIC ---
+        map.on('pm:create', function(e) {
+            const layer = e.layer;
+            const geojson = layer.toGeoJSON();
+            const currentStyle = getCurrentStyle();
+            
+            coordList.innerHTML = '';
+
+            if (e.shape === 'Polygon' || e.shape === 'Rectangle') {
+                layer.setStyle({ color: currentStyle.color, fillColor: currentStyle.color, fillOpacity: 0.4, weight: 2 });
+
+                if(!layer.feature) layer.feature = { type: 'Feature', properties: {} };
+                layer.feature.properties.category = currentStyle.type;
+                layer.feature.properties.color = currentStyle.color;
+
+                areaVal.innerHTML = `${turf.area(geojson).toFixed(2)} <span>Sq. M</span>`;
+                perimeterVal.innerText = `Perimeter ${(turf.length(geojson, { units: 'kilometers' }) * 1000).toFixed(2)} M`;
+
+                updateUTMPanel(geojson.geometry.coordinates[0]);
+                
+                if (currentStyle.type === 'Land Parcel') {
+                    openModal(layer); 
+                } 
+                else if (currentStyle.type.includes('Building')) {
+                    let parentParcel = null;
+                    const buildingCenter = turf.centerOfMass(geojson);
+
+                    map.pm.getGeomanLayers().forEach(l => {
+                        if (l.feature && l.feature.properties.category === 'Land Parcel') {
+                            if (turf.booleanPointInPolygon(buildingCenter, l.toGeoJSON())) parentParcel = l;
+                        }
+                    });
+
+                    if (parentParcel) {
+                        const pId = parentParcel.feature.properties.parcelId;
+                        layer.feature.properties.parentParcelId = pId;
+                        let existingBlocks = 0;
+                        map.pm.getGeomanLayers().forEach(l => {
+                            if (l.feature && l.feature.properties.parentParcelId === pId) existingBlocks++;
+                        });
+                        layer.feature.properties.blockId = `Blk${String(existingBlocks + 1).padStart(2, '0')}`;
+                    } else {
+                        layer.feature.properties.parentParcelId = 'Standalone';
+                        layer.feature.properties.blockId = 'Blk??';
+                    }
+                    layer.feature.properties.material = currentStyle.type.replace('Building - ', '');
+                }
+
+                generatePopup(layer);
+                refreshAllPopups();
+
+                layer.on('pm:edit', function(evt) {
+                    const updatedGeojson = evt.layer.toGeoJSON();
+                    areaVal.innerHTML = `${turf.area(updatedGeojson).toFixed(2)} <span>Sq. M</span>`;
+                    perimeterVal.innerText = `Perimeter ${(turf.length(updatedGeojson, { units: 'kilometers' }) * 1000).toFixed(2)} M`;
+                    updateUTMPanel(updatedGeojson.geometry.coordinates[0]);
+                    generatePopup(evt.layer);
+                    refreshAllPopups();
+                    autoSave();
+                });
+
+                layer.on('dblclick', function() {
+                    if (layer.feature.properties.category === 'Land Parcel') openModal(layer);
+                });
+
+            } 
+            else if (e.shape === 'Line') {
+                areaVal.innerHTML = `${(turf.length(geojson, { units: 'kilometers' }) * 1000).toFixed(2)} <span>M</span>`;
+                perimeterVal.innerText = `Total Distance`;
+                coordPanel.style.display = 'none';
+            }
+
+            saveHistory();
+            autoSave();
+        });
+
+        // --- UNDO / REDO / LOAD LOGIC ---
+        function saveHistory() {
+            const geojson = map.pm.getGeomanLayers(true).toGeoJSON();
+            if (historyIndex < history.length - 1) history = history.slice(0, historyIndex + 1);
+            history.push(JSON.parse(JSON.stringify(geojson))); 
+            historyIndex++;
+        }
+
+        document.getElementById('undoBtn').addEventListener('click', () => {
+            if (historyIndex > 0) { historyIndex--; restoreFromHistory(history[historyIndex]); autoSave(); }
+        });
+
+        document.getElementById('redoBtn').addEventListener('click', () => {
+            if (historyIndex < history.length - 1) { historyIndex++; restoreFromHistory(history[historyIndex]); autoSave(); }
+        });
+
+        document.getElementById('clearDataBtn').addEventListener('click', () => {
+            if(confirm("Are you absolutely sure you want to delete ALL map data? This cannot be undone.")) {
+                localStorage.removeItem('ethiopiaMapData_Forever');
+                map.pm.getGeomanLayers().forEach(layer => map.removeLayer(layer));
+                history = [];
+                historyIndex = -1;
+                areaVal.innerHTML = `0.00 <span>Sq. M</span>`;
+                perimeterVal.innerText = `Perimeter 0.00 M`;
+                coordPanel.style.display = 'none';
+            }
+        });
+
+        function restoreFromHistory(geojson) {
+            map.pm.getGeomanLayers().forEach(layer => map.removeLayer(layer));
+            coordPanel.style.display = 'none';
+            
+            L.geoJSON(geojson, {
+                onEachFeature: (feature, layer) => {
+                    map.pm.addLayer(layer); 
+                    if (feature.properties && feature.properties.category) {
+                        generatePopup(layer);
+                        layer.on('pm:edit', function(evt) {
+                            generatePopup(evt.layer);
+                            refreshAllPopups();
+                            autoSave();
+                        });
+                        layer.on('dblclick', function() {
+                            if (feature.properties.category === 'Land Parcel') openModal(layer);
+                        });
+                    }
+                }
+            });
+            refreshAllPopups();
+        }
+
+        // --- LOAD ON STARTUP ---
+        window.addEventListener('load', () => {
+            const savedData = localStorage.getItem('ethiopiaMapData_Forever');
+            if (savedData) restoreFromHistory(JSON.parse(savedData));
+        });
+
+        document.getElementById('loadBtn').addEventListener('click', () => {
+            const savedData = localStorage.getItem('ethiopiaMapData_Forever');
+            if (savedData) {
+                restoreFromHistory(JSON.parse(savedData));
+                alert('Map data reloaded from local system.');
+            } else {
+                alert('No saved data found.');
+            }
+        });
+
+        document.getElementById('saveBtn').addEventListener('click', () => {
+            autoSave();
+            alert('Data saved successfully!');
+        });
+
+        // --- DATA FLATTENING FOR EXPORT ---
+        function getExportData() {
+            const rows = [];
+            const allLayers = map.pm.getGeomanLayers();
+            const parcels = allLayers.filter(l => l.feature && l.feature.properties.category === 'Land Parcel');
+            const buildings = allLayers.filter(l => l.feature && l.feature.properties.category.includes('Building'));
+
+            parcels.forEach(parcel => {
+                const pProps = parcel.feature.properties;
+                const pArea = turf.area(parcel.toGeoJSON()).toFixed(2);
+                const pId = pProps.parcelId || 'Unassigned';
+                const owner = pProps.ownerName || 'N/A';
+
+                const linkedBuildings = buildings.filter(b => b.feature.properties.parentParcelId === pId);
+
+                if (linkedBuildings.length === 0) {
+                    rows.push({ 'Parcel ID': pId, 'Owner Name': owner, 'Parcel Area (m²)': pArea, 'Block ID': 'None', 'Material': 'None', 'Block Area (m²)': '0.00' });
+                } else {
+                    linkedBuildings.forEach(building => {
+                        const bProps = building.feature.properties;
+                        const bArea = turf.area(building.toGeoJSON()).toFixed(2);
+                        rows.push({ 'Parcel ID': pId, 'Owner Name': owner, 'Parcel Area (m²)': pArea, 'Block ID': bProps.blockId || 'Blk??', 'Material': bProps.material || 'Unknown', 'Block Area (m²)': bArea });
+                    });
+                }
+            });
+
+            buildings.filter(b => !b.feature.properties.parentParcelId || b.feature.properties.parentParcelId === 'Standalone').forEach(building => {
+                const bProps = building.feature.properties;
+                rows.push({ 'Parcel ID': 'Standalone', 'Owner Name': 'N/A', 'Parcel Area (m²)': '0.00', 'Block ID': bProps.blockId || 'Blk??', 'Material': bProps.material || 'Unknown', 'Block Area (m²)': turf.area(building.toGeoJSON()).toFixed(2) });
+            });
+
+            return rows;
+        }
+
+        // --- EXPORT EXCEL ---
+        document.getElementById('exportExcel').addEventListener('click', () => {
+            const data = getExportData();
+            if(data.length === 0) return alert("No data to export.");
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Parcel Registry");
+            XLSX.writeFile(wb, "Ethiopia_Parcel_Registry.xlsx");
+        });
+
+        // --- EXPORT CSV ---
+        document.getElementById('exportCSV').addEventListener('click', () => {
+            const data = getExportData();
+            if(data.length === 0) return alert("No data to export.");
+            const headers = Object.keys(data[0]);
+            const csvRows = [headers.join(',')];
+            
+            data.forEach(row => {
+                const values = headers.map(header => {
+                    const val = row[header] || '';
+                    return `"${val}"`;
+                });
+                csvRows.push(values.join(','));
+            });
+            
+            const csvString = csvRows.join('\n');
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'Ethiopia_Parcel_Registry.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+
+        // --- VIEW & DOWNLOAD PDF ---
+        function generatePDF() {
+            const data = getExportData();
+            if(data.length === 0) {
+                alert("No data to export.");
+                return null;
+            }
+            
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            doc.text("Ethiopia Pro Map - Parcel & Block Report", 14, 15);
+            
+            const headers = Object.keys(data[0]);
+            const body = data.map(row => headers.map(h => row[h]));
+            
+            doc.autoTable({
+                head: [headers],
+                body: body,
+                startY: 25,
+                styles: { fontSize: 8 },
+                headStyles: { fillColor: [0, 123, 255] },
+                alternateRowStyles: { fillColor: [245, 245, 245] }
+            });
+            
+            return doc;
+        }
+
+        document.getElementById('viewPDF').addEventListener('click', () => {
+            const doc = generatePDF();
+            if (doc) {
+                const blobUrl = doc.output('bloburl');
+                window.open(blobUrl, '_blank');
+            }
+        });
+
+        document.getElementById('downloadPDF').addEventListener('click', () => {
+            const doc = generatePDF();
+            if (doc) doc.save('Ethiopia_Parcel_Report.pdf');
+        });
+
+        // --- CLEANUP ---
+        map.on('pm:remove', function(e) {
+            if (map.pm.getGeomanLayers().length === 0) {
+                areaVal.innerHTML = `0.00 <span>Sq. M</span>`;
+                perimeterVal.innerText = `Perimeter 0.00 M`;
+                coordPanel.style.display = 'none';
+            }
+            saveHistory();
+            refreshAllPopups(); 
+            autoSave();
+        });
+
+    </script>
+</body>
+</html>dhagwayn map.html
