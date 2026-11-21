@@ -11,86 +11,59 @@
     
     <style>
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; }
-        
-        /* Map Container - Leaves space at bottom for nav bar */
         #map { height: calc(100vh - 60px); width: 100vw; background: #1a1a1a; transform: translateZ(0); will-change: transform; }
         
-        /* =========================================
-           TOP HORIZONTAL PANEL (Measurement)
-           ========================================= */
-        .top-panel { 
-            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+        /* TOP HORIZONTAL PANEL */
+        .top-panel { position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
             background-color: rgba(0, 0, 0, 0.85); color: white; padding: 10px 20px;
             border-radius: 12px; text-align: center; z-index: 1000; pointer-events: none;
-            min-width: 150px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); 
-        }
+            min-width: 150px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); }
         .area-text { margin: 0; font-size: 24px; font-weight: bold; }
         .area-text span { font-size: 14px; font-weight: normal; color: #aaa; }
         .perimeter-text { margin: 3px 0 0 0; font-size: 12px; color: #ccc; }
 
-        /* =========================================
-           BOTTOM HORIZONTAL NAVIGATION BAR
-           ========================================= */
-        .bottom-nav {
-            position: absolute; bottom: 0; left: 0; width: 100%; height: 60px;
+        /* BOTTOM HORIZONTAL NAVIGATION BAR */
+        .bottom-nav { position: absolute; bottom: 0; left: 0; width: 100%; height: 60px;
             background: #ffffff; box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-            display: flex; align-items: center; z-index: 1000; padding: 0 10px; box-sizing: border-box;
-        }
+            display: flex; align-items: center; z-index: 1000; padding: 0 10px; box-sizing: border-box; }
         
-        /* Property Selector (Fixed Left side of bottom nav) */
-        .property-selector {
-            display: flex; align-items: center; gap: 5px; margin-right: 10px;
-            border-right: 1px solid #ddd; padding-right: 10px; white-space: nowrap;
-        }
+        .property-selector { display: flex; align-items: center; gap: 5px; margin-right: 10px;
+            border-right: 1px solid #ddd; padding-right: 10px; white-space: nowrap; }
         .property-selector label { font-size: 12px; font-weight: bold; color: #333; }
         .property-selector select { padding: 6px; border-radius: 6px; border: 1px solid #ccc; font-size: 12px; font-weight: bold; outline: none; }
 
-        /* Action Buttons (Scrollable horizontally) */
-        .action-buttons {
-            display: flex; gap: 8px; overflow-x: auto; flex: 1; padding-bottom: 5px; padding-top: 5px;
-            scrollbar-width: none; /* Firefox */
-        }
-        .action-buttons::-webkit-scrollbar { display: none; } /* Chrome */
+        .action-buttons { display: flex; gap: 8px; overflow-x: auto; flex: 1; padding-bottom: 5px; padding-top: 5px; scrollbar-width: none; }
+        .action-buttons::-webkit-scrollbar { display: none; }
         
-        .action-buttons button { 
-            padding: 8px 12px; border: none; border-radius: 6px; background: #f0f0f0;
+        .action-buttons button { padding: 8px 12px; border: none; border-radius: 6px; background: #f0f0f0;
             cursor: pointer; font-weight: bold; font-size: 12px; white-space: nowrap;
-            display: flex; align-items: center; gap: 4px; transition: background 0.2s;
-        }
+            display: flex; align-items: center; gap: 4px; transition: background 0.2s; }
         .action-buttons button:hover { background: #e0e0e0; }
         
         /* Button Colors */
         .btn-danger { color: #d32f2f !important; background: #ffebee !important; }
         .btn-export { background: #e3f2fd !important; color: #0056b3 !important; }
         .btn-view { background: #e8f5e9 !important; color: #2e7d32 !important; }
+        .btn-backup { background: #fff3e0 !important; color: #e65100 !important; }
 
-        /* =========================================
-           LEFT VERTICAL PANEL (Coordinates)
-           ========================================= */
-        .coords-panel { 
-            position: absolute; bottom: 75px; left: 15px; background: rgba(255,255,255,0.95); padding: 8px;
+        /* LEFT VERTICAL PANEL */
+        .coords-panel { position: absolute; bottom: 75px; left: 15px; background: rgba(255,255,255,0.95); padding: 8px;
             border-radius: 8px; z-index: 1000; max-height: 150px; overflow-y: auto; width: 130px;
-            display: none; font-size: 11px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); border-left: 3px solid #007bff; 
-        }
+            display: none; font-size: 11px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); border-left: 3px solid #007bff; }
         .coords-panel strong { display: block; margin-bottom: 5px; border-bottom: 1px solid #eee; padding-bottom: 5px; font-size: 10px;}
         ul#coord-list { margin: 0; padding-left: 10px; font-family: monospace; }
 
         /* Geoman Toolbar adjustments */
         .leaflet-pm-toolbar { margin-top: 75px !important; margin-left: 10px !important; }
         .leaflet-measure-control { margin-top: 75px !important; margin-right: 10px !important; }
-        
         .leaflet-tile { filter: none !important; }
         .leaflet-zoom-animated { transition: transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1); }
 
         /* --- MODAL STYLES --- */
-        .modal-overlay {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6); z-index: 2000; justify-content: center; align-items: center;
-        }
-        .modal-content {
-            background: white; padding: 20px; border-radius: 10px; width: 85%; max-width: 350px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3); font-size: 14px;
-        }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); z-index: 2000; justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 20px; border-radius: 10px; width: 85%; max-width: 350px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3); font-size: 14px; }
         .modal-content h2 { margin-top: 0; font-size: 18px; color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
         .form-group { margin-bottom: 12px; display: flex; flex-direction: column; }
         .form-group label { font-weight: bold; margin-bottom: 4px; color: #555; }
@@ -129,7 +102,6 @@
 
     <!-- BOTTOM HORIZONTAL NAVIGATION BAR -->
     <div class="bottom-nav">
-        <!-- Property Selector (Fixed on left) -->
         <div class="property-selector">
             <label>Type:</label>
             <select id="featureType">
@@ -142,12 +114,17 @@
             </select>
         </div>
 
-        <!-- Action Buttons (Scrollable horizontally) -->
         <div class="action-buttons">
             <button id="undoBtn">↩ Undo</button>
             <button id="redoBtn">↪ Redo</button>
-            <button id="saveBtn">💾 Save</button>
+            <button id="saveBtn">💾 Save to Phone</button>
             <button id="loadBtn">🔄 Reload</button>
+            
+            <!-- New Backup Buttons -->
+            <button id="exportProjectBtn" class="btn-backup">📁 Backup File</button>
+            <button id="importProjectBtn" class="btn-backup">📂 Restore File</button>
+            <input type="file" id="importFileInput" style="display:none;" accept=".json,.geojson">
+
             <button id="clearDataBtn" class="btn-danger">🗑️ Clear</button>
             <button id="exportExcel" class="btn-export">📊 Excel</button>
             <button id="exportCSV" class="btn-export">📄 CSV</button>
@@ -196,40 +173,29 @@
     <script>
         proj4.defs("EPSG:32638", "+proj=utm +zone=38 +datum=WGS84 +units=m +no_defs");
 
-        // MAP INITIALIZATION - Optimized for high zoom
+        // MAP INITIALIZATION
         const map = L.map('map', {
-            zoomControl: false, 
-            minZoom: 3, 
-            maxZoom: 22, // Allow very deep zoom
-            zoomSnap: 0.5, 
-            zoomDelta: 0.5, 
-            wheelPxPerZoomLevel: 120,
-            updateWhenZooming: false, 
-            updateWhenIdle: true
+            zoomControl: false, minZoom: 3, maxZoom: 22, zoomSnap: 0.5, zoomDelta: 0.5, 
+            wheelPxPerZoomLevel: 120, updateWhenZooming: false, updateWhenIdle: true
         }).setView([9.0310, 38.7410], 17);
 
         // HIGH RESOLUTION SATELLITE IMAGERY
-        // 'lyrs=s' gets pure satellite. 'maxNativeZoom: 20' pushes Google to its highest real resolution, map scales further up to 22.
         L.tileLayer('https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-            maxZoom: 22, 
-            maxNativeZoom: 20,
-            subdomains: ['0', '1', '2', '3'],
-            detectRetina: true,
-            attribution: '&copy; Google Maps'
+            maxZoom: 22, maxNativeZoom: 20, subdomains: ['0', '1', '2', '3'],
+            detectRetina: true, attribution: '&copy; Google Maps'
         }).addTo(map);
 
         L.control.scale({ metric: true, imperial: false, position: 'bottomleft' }).addTo(map);
 
-        // VERTICAL NAVIGATION: Measuring Ruler (Top Right)
+        // VERTICAL NAVIGATION: Measuring Ruler
         const measureControl = new L.Control.Measure({
-            position: 'topright', 
-            primaryLengthUnit: 'meters', secondaryLengthUnit: 'kilometers',
+            position: 'topright', primaryLengthUnit: 'meters', secondaryLengthUnit: 'kilometers',
             primaryAreaUnit: 'sqmeters', secondaryAreaUnit: 'hectares',
             activeColor: '#007bff', completedColor: '#0056b3'
         });
         measureControl.addTo(map);
 
-        // VERTICAL NAVIGATION: Drawing Tools (Top Left)
+        // VERTICAL NAVIGATION: Drawing Tools
         map.pm.addControls({
             position: 'topleft', drawMarker: false, drawCircleMarker: false,
             drawPolyline: true, drawRectangle: true, drawPolygon: true,
@@ -318,7 +284,7 @@
             });
         }
 
-        // --- AUTO-SAVE FUNCTION ---
+        // --- AUTO-SAVE FUNCTION (Saves to Browser LocalStorage) ---
         function autoSave() {
             const layers = map.pm.getGeomanLayers(true);
             const geojson = layers.toGeoJSON();
@@ -484,22 +450,66 @@
         // --- LOAD ON STARTUP ---
         window.addEventListener('load', () => {
             const savedData = localStorage.getItem('ethiopiaMapData_Forever');
-            if (savedData) restoreFromHistory(JSON.parse(savedData));
+            if (savedData) {
+                restoreFromHistory(JSON.parse(savedData));
+            }
         });
 
         document.getElementById('loadBtn').addEventListener('click', () => {
             const savedData = localStorage.getItem('ethiopiaMapData_Forever');
             if (savedData) {
                 restoreFromHistory(JSON.parse(savedData));
-                alert('Map data reloaded from local system.');
+                alert('Map data reloaded from browser memory.');
             } else {
-                alert('No saved data found.');
+                alert('No saved data found in browser memory.');
             }
         });
 
         document.getElementById('saveBtn').addEventListener('click', () => {
             autoSave();
-            alert('Data saved successfully!');
+            alert('Data saved to browser memory!');
+        });
+
+        // --- EXPORT PROJECT FILE (Backup) ---
+        document.getElementById('exportProjectBtn').addEventListener('click', () => {
+            const geojson = map.pm.getGeomanLayers(true).toGeoJSON();
+            if(geojson.features.length === 0) return alert("No data to backup.");
+            
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(geojson));
+            const a = document.createElement('a');
+            a.setAttribute("href", dataStr);
+            a.setAttribute("download", "Ethiopia_Map_Backup.json");
+            document.body.appendChild(a); 
+            a.click(); 
+            a.remove();
+        });
+
+        // --- IMPORT PROJECT FILE (Restore) ---
+        document.getElementById('importProjectBtn').addEventListener('click', () => {
+            document.getElementById('importFileInput').click();
+        });
+
+        document.getElementById('importFileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const contents = e.target.result;
+                    const geojson = JSON.parse(contents);
+                    
+                    // Clear current map and load new data
+                    map.pm.getGeomanLayers().forEach(layer => map.removeLayer(layer));
+                    restoreFromHistory(geojson);
+                    autoSave(); // Save the newly imported data to local storage
+                    alert('Project restored successfully!');
+                } catch (error) {
+                    alert('Error reading file. Please ensure it is a valid JSON backup.');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Reset input
         });
 
         // --- DATA FLATTENING FOR EXPORT ---
@@ -626,4 +636,4 @@
 
     </script>
 </body>
-</html>dhagwayn map.html
+</html>
