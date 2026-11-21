@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Ethiopia Pro Map | Pro Layout</title>
+    <title>Ethiopia Pro Map | Wajale</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.20.6/dist/leaflet-geoman.css" />
@@ -73,6 +73,8 @@
         .modal-actions button { padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .btn-cancel { background: #ccc; color: #333; }
         .btn-save { background: #28a745; color: white; }
+        
+        textarea.paste-area { width: 100%; height: 120px; margin-top: 10px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; font-size: 11px; resize: none; box-sizing: border-box; }
 
         /* Custom Popup Styling */
         .leaflet-popup-content-wrapper { border-radius: 8px; box-shadow: 0 3px 14px rgba(0,0,0,0.4); }
@@ -117,10 +119,12 @@
         <div class="action-buttons">
             <button id="undoBtn">↩ Undo</button>
             <button id="redoBtn">↪ Redo</button>
-            <button id="saveBtn">💾 Save to Phone</button>
-            <button id="loadBtn">🔄 Reload</button>
             
-            <!-- New Backup Buttons -->
+            <!-- Text Backup Buttons -->
+            <button id="copyDataBtn" class="btn-backup">📋 Copy Text</button>
+            <button id="pasteDataBtn" class="btn-backup">📥 Paste Data</button>
+            
+            <!-- File Backup Buttons -->
             <button id="exportProjectBtn" class="btn-backup">📁 Backup File</button>
             <button id="importProjectBtn" class="btn-backup">📂 Restore File</button>
             <input type="file" id="importFileInput" style="display:none;" accept=".json,.geojson">
@@ -158,6 +162,19 @@
         </div>
     </div>
 
+    <!-- Paste Data Modal -->
+    <div class="modal-overlay" id="pasteModal">
+        <div class="modal-content">
+            <h2>Paste Backup Data</h2>
+            <p style="font-size:12px; color:#666;">Paste the text you copied from your Gmail, WhatsApp, or Notes app below.</p>
+            <textarea id="pasteTextArea" class="paste-area" placeholder="Paste JSON data here..."></textarea>
+            <div class="modal-actions">
+                <button type="button" class="btn-cancel" onclick="document.getElementById('pasteModal').style.display='none'">Cancel</button>
+                <button type="button" class="btn-save" id="confirmPasteBtn">Restore Data</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Libraries -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.20.6/dist/leaflet-geoman.js"></script>
@@ -173,13 +190,13 @@
     <script>
         proj4.defs("EPSG:32638", "+proj=utm +zone=38 +datum=WGS84 +units=m +no_defs");
 
-        // MAP INITIALIZATION
+        // MAP INITIALIZATION - Centered on Wajale City
+        // Coordinates: 9.5966, 43.3333
         const map = L.map('map', {
             zoomControl: false, minZoom: 3, maxZoom: 22, zoomSnap: 0.5, zoomDelta: 0.5, 
             wheelPxPerZoomLevel: 120, updateWhenZooming: false, updateWhenIdle: true
-        }).setView([9.0310, 38.7410], 17);
+        }).setView([9.5966, 43.3333], 16);
 
-        // HIGH RESOLUTION SATELLITE IMAGERY
         L.tileLayer('https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
             maxZoom: 22, maxNativeZoom: 20, subdomains: ['0', '1', '2', '3'],
             detectRetina: true, attribution: '&copy; Google Maps'
@@ -187,7 +204,6 @@
 
         L.control.scale({ metric: true, imperial: false, position: 'bottomleft' }).addTo(map);
 
-        // VERTICAL NAVIGATION: Measuring Ruler
         const measureControl = new L.Control.Measure({
             position: 'topright', primaryLengthUnit: 'meters', secondaryLengthUnit: 'kilometers',
             primaryAreaUnit: 'sqmeters', secondaryAreaUnit: 'hectares',
@@ -195,7 +211,6 @@
         });
         measureControl.addTo(map);
 
-        // VERTICAL NAVIGATION: Drawing Tools
         map.pm.addControls({
             position: 'topleft', drawMarker: false, drawCircleMarker: false,
             drawPolyline: true, drawRectangle: true, drawPolygon: true,
@@ -234,7 +249,6 @@
             coordPanel.style.display = 'block';
         }
 
-        // --- POPUP GENERATION LOGIC ---
         function generatePopup(layer) {
             const props = layer.feature.properties;
             const geojson = layer.toGeoJSON();
@@ -284,14 +298,13 @@
             });
         }
 
-        // --- AUTO-SAVE FUNCTION (Saves to Browser LocalStorage) ---
         function autoSave() {
             const layers = map.pm.getGeomanLayers(true);
             const geojson = layers.toGeoJSON();
             localStorage.setItem('ethiopiaMapData_Forever', JSON.stringify(geojson));
+            console.log("Data Auto-Saved");
         }
 
-        // --- MODAL LOGIC ---
         function openModal(layer) {
             activeParcelLayer = layer;
             document.getElementById('modalParcelArea').value = turf.area(layer.toGeoJSON()).toFixed(2) + " m²";
@@ -320,7 +333,6 @@
             autoSave();
         });
 
-        // --- SHAPE CREATION LOGIC ---
         map.on('pm:create', function(e) {
             const layer = e.layer;
             const geojson = layer.toGeoJSON();
@@ -396,7 +408,6 @@
             autoSave();
         });
 
-        // --- UNDO / REDO / LOAD LOGIC ---
         function saveHistory() {
             const geojson = map.pm.getGeomanLayers(true).toGeoJSON();
             if (historyIndex < history.length - 1) history = history.slice(0, historyIndex + 1);
@@ -424,11 +435,14 @@
             }
         });
 
+        // --- FIXED: RESTORE FUNCTION NOW PROPERLY ADDS LAYERS TO THE MAP ---
         function restoreFromHistory(geojson) {
+            // Clear existing layers
             map.pm.getGeomanLayers().forEach(layer => map.removeLayer(layer));
             coordPanel.style.display = 'none';
             
-            L.geoJSON(geojson, {
+            // Add new layers to map
+            const geoJsonLayer = L.geoJSON(geojson, {
                 onEachFeature: (feature, layer) => {
                     map.pm.addLayer(layer); 
                     if (feature.properties && feature.properties.category) {
@@ -444,30 +458,70 @@
                     }
                 }
             });
+            
+            // THIS WAS MISSING: It adds the restored shapes visually to the map!
+            geoJsonLayer.addTo(map); 
+            
             refreshAllPopups();
         }
 
         // --- LOAD ON STARTUP ---
-        window.addEventListener('load', () => {
+        map.whenReady(() => {
             const savedData = localStorage.getItem('ethiopiaMapData_Forever');
             if (savedData) {
-                restoreFromHistory(JSON.parse(savedData));
+                const parsed = JSON.parse(savedData);
+                // Only restore if there are actually features to draw
+                if (parsed.features && parsed.features.length > 0) {
+                    restoreFromHistory(parsed);
+                    console.log("✅ Restored saved data from browser memory.");
+                }
             }
         });
 
-        document.getElementById('loadBtn').addEventListener('click', () => {
+        // --- MANUAL LOAD BUTTON ---
+        document.getElementById('loadBtn')?.addEventListener('click', () => {
             const savedData = localStorage.getItem('ethiopiaMapData_Forever');
             if (savedData) {
                 restoreFromHistory(JSON.parse(savedData));
                 alert('Map data reloaded from browser memory.');
             } else {
-                alert('No saved data found in browser memory.');
+                alert('No saved data found.');
             }
         });
 
-        document.getElementById('saveBtn').addEventListener('click', () => {
-            autoSave();
-            alert('Data saved to browser memory!');
+        // --- COPY / PASTE DATA ---
+        document.getElementById('copyDataBtn').addEventListener('click', () => {
+            const geojson = map.pm.getGeomanLayers(true).toGeoJSON();
+            if(geojson.features.length === 0) return alert("No data to copy.");
+            
+            const dataStr = JSON.stringify(geojson);
+            navigator.clipboard.writeText(dataStr).then(() => {
+                alert('✅ Data copied to clipboard!\n\nYou can now paste this text into a Gmail draft, WhatsApp message, or Notes app to save it.');
+            }).catch(err => {
+                alert('Failed to copy text. Please use the "Backup File" button instead.');
+            });
+        });
+
+        document.getElementById('pasteDataBtn').addEventListener('click', () => {
+            document.getElementById('pasteTextArea').value = '';
+            document.getElementById('pasteModal').style.display = 'flex';
+        });
+
+        document.getElementById('confirmPasteBtn').addEventListener('click', () => {
+            const text = document.getElementById('pasteTextArea').value;
+            if(!text) return alert('Please paste some data first.');
+            
+            try {
+                const geojson = JSON.parse(text);
+                if (!geojson.features) throw new Error("Invalid format");
+                
+                restoreFromHistory(geojson);
+                autoSave();
+                document.getElementById('pasteModal').style.display = 'none';
+                alert('✅ Data restored successfully from clipboard!');
+            } catch (e) {
+                alert('❌ Error: The pasted text is not valid map data.');
+            }
         });
 
         // --- EXPORT PROJECT FILE (Backup) ---
@@ -499,17 +553,15 @@
                     const contents = e.target.result;
                     const geojson = JSON.parse(contents);
                     
-                    // Clear current map and load new data
-                    map.pm.getGeomanLayers().forEach(layer => map.removeLayer(layer));
                     restoreFromHistory(geojson);
-                    autoSave(); // Save the newly imported data to local storage
+                    autoSave(); 
                     alert('Project restored successfully!');
                 } catch (error) {
                     alert('Error reading file. Please ensure it is a valid JSON backup.');
                 }
             };
             reader.readAsText(file);
-            event.target.value = ''; // Reset input
+            event.target.value = ''; 
         });
 
         // --- DATA FLATTENING FOR EXPORT ---
@@ -622,7 +674,6 @@
             if (doc) doc.save('Ethiopia_Parcel_Report.pdf');
         });
 
-        // --- CLEANUP ---
         map.on('pm:remove', function(e) {
             if (map.pm.getGeomanLayers().length === 0) {
                 areaVal.innerHTML = `0.00 <span>Sq. M</span>`;
